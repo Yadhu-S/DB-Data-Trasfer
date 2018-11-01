@@ -95,14 +95,14 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 		log.Println("Synchronization imminent")
 		if AWSProductsCount > GCPProductsCount {
 			for i := GCPProductsCount; i <= AWSProductsCount; i++ {
-				GCPProducts = append(GCPProducts, GCPProductDetails{
-					Tag: "null",
+				GCPProducts = append(GCPProducts, GCPProductDetails{ // To make size of both arrays the same
+					Tag: "null", //insert null values to make them same ;)
 				})
 			}
-			for i := range AWSProducts {
+			for i := range AWSProducts { //iteriate through each product in aws db
 				matchFound := false
-				for j := range GCPProducts {
-					if AWSProducts[i].Tag == GCPProducts[j].Tag {
+				for j := range GCPProducts { //iteriate through each product in gcp db
+					if AWSProducts[i].Tag == GCPProducts[j].Tag { // if a match is found break the gcp loop and continuethe aws iteration
 						matchFound = true
 						break
 					}
@@ -112,11 +112,11 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 					(id_category, name, description, price, mrp, date_created, thumbnail, tag)
 					VALUES(0, ?, ?, ?, ?, ?, ?, ?);
 					`, AWSProducts[i].Title, AWSProducts[i].Desc, AWSProducts[i].SellingPrice, AWSProducts[i].Mrp, AWSProducts[i].DateCr, AWSProducts[i].ImgName, AWSProducts[i].Tag); err != nil {
-						log.Println("Sync failure", err)
+						log.Println("Insert failure", err)
 					}
 				}
 			}
-		} else {
+		} else { // same thing as before but for deletion of products in the GCP (webapp) DB
 			for i := AWSProductsCount; i <= GCPProductsCount; i++ {
 				AWSProducts = append(AWSProducts, AWSProductDetails{
 					Tag: "null",
