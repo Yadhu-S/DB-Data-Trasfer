@@ -104,6 +104,7 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 				for j := range GCPProducts {
 					if AWSProducts[i].Tag == GCPProducts[j].Tag {
 						matchFound = true
+						break
 					}
 				}
 				if !matchFound {
