@@ -80,7 +80,7 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	AWSProducts := []AWSProductDetails{}
 	if err := serv.AWSProductionDB.Select(&AWSProducts, `SELECT ProductTitle, ProductDesc, MRP, SellingPrice, tag, DateCreated, img_details.img_name 
 	FROM product_details
-	LEFT JOIN img_details ON product_details.tag = img_details.product_tag AND img_details.img_slot = '1' WHERE Deleted = 0;`); err != nil {
+	LEFT JOIN img_details ON product_details.tag = img_details.product_tag AND img_details.img_slot = '1' WHERE Deleted = 0;`); err != nil { //join image details table and select non-deleted products form AWS database
 		log.Println(err)
 	}
 	GCPProducts := []GCPProductDetails{}
@@ -102,7 +102,7 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 			for i := range AWSProducts { //iteriate through each product in aws db
 				matchFound := false
 				for j := range GCPProducts { //iteriate through each product in gcp db
-					if AWSProducts[i].Tag == GCPProducts[j].Tag { // if a match is found break the gcp loop and continuethe aws iteration
+					if AWSProducts[i].Tag == GCPProducts[j].Tag { // if a match is found break the gcp loop and continue the aws iteration
 						matchFound = true
 						break
 					}
