@@ -11,23 +11,23 @@ import (
 	"github.com/spf13/viper"
 )
 
-//ProductDetails is the substruct of product details without shop-id
-type ProductDetails struct {
-	Title        string      `json:"title" db:"ProductTitle"`
-	Desc         string      `json:"description" db:"ProductDesc" `
-	Mrp          float32     `json:"mrp,omitempty" db:"MRP"`
-	SellingPrice float32     `json:"retail,omitempty" db:"SellingPrice" `
-	Tag          string      `json:"tag" db:"tag"`
+//AWSProductDetails is used in the application server(billing software)
+type AWSProductDetails struct {
+	Title        string      `db:"ProductTitle"`
+	Desc         string      `db:"ProductDesc" `
+	Mrp          float32     `db:"MRP"`
+	SellingPrice float32     `db:"SellingPrice" `
+	Tag          string      `db:"tag"`
 	DateCr       string      `db:"DateCreated"`
 	ImgName      interface{} `db:"img_name"`
 }
 
-//WebProducts contains .. meh..
-type WebProducts struct {
-	Title        string  `json:"title" db:"name"`
-	Desc         string  `json:"description" db:"description" `
-	Mrp          float32 `json:"mrp,omitempty" db:"mrp"`
-	SellingPrice float32 `json:"retail,omitempty" db:"price" `
+//GCPProductDetails is used for the PHP application (¬_¬)
+type GCPProductDetails struct {
+	Title        string  `db:"name"`
+	Desc         string  `db:"description" `
+	Mrp          float32 `db:"mrp"`
+	SellingPrice float32 `db:"price" `
 	Tag          string  `db:"tag"`
 	DateCr       string  `db:"date_created"`
 }
@@ -37,41 +37,57 @@ type sm struct {
 	Message string
 }
 
-//BeginTransfer starts the transfer process
-func BeginTransfer(w http.ResponseWriter, r *http.Request) {
-	log.Println("Insertion started.")
+//Services has contains both db resources
+type Services struct {
+	AWSProductionDB *sqlx.DB
+	GCPWebAppDb     *sqlx.DB
+}
+
+var serv *Services
+
+//InitilizeApp engages
+func InitilizeApp() {
 	viper.AddConfigPath("config")
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("config loaded")
-
-	prodDbSource := fmt.Sprintf("%s:%s@tcp(%s)/%s", viper.GetString("prod_db_user"), viper.GetString("prod_db_pass"), viper.GetString("prod_db_host"), viper.GetString("prod_db_name"))
-	fmt.Println(prodDbSource)
-	prodDB := sqlx.MustConnect("mysql", prodDbSource)
-	prodDB.SetMaxOpenConns(viper.GetInt("web_db_max_open"))
-	prodDB.SetMaxIdleConns(viper.GetInt("web_db_max_idle"))
+	AWSSource := fmt.Sprintf("%s:%s@tcp(%s)/%s", viper.GetString("prod_db_user"), viper.GetString("prod_db_pass"), viper.GetString("prod_db_host"), viper.GetString("prod_db_name"))
+	AWSDB := sqlx.MustConnect("mysql", AWSSource)
+	AWSDB.SetMaxOpenConns(viper.GetInt("web_db_max_open"))
+	AWSDB.SetMaxIdleConns(viper.GetInt("web_db_max_idle"))
 	log.Println("Opening producion db")
-	if err := prodDB.Ping(); err != nil {
+	if err := AWSDB.Ping(); err != nil {
 		panic(fmt.Sprintf("(╯‵Д′)╯彡┻━┻ unable to connect to web DB  err: %s", err))
 	}
 	log.Println("Production db opened")
-	AWSProducts := []ProductDetails{}
-	if err := prodDB.Select(&AWSProducts, `SELECT ProductTitle, ProductDesc, MRP, SellingPrice, tag, DateCreated, img_details.img_name 
+
+	GCPDB := sqlx.MustOpen("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", viper.GetString("web_db_user"), viper.GetString("web_db_pass"), viper.GetString("web_db_host"), viper.GetString("web_db_name")))
+	GCPDB.SetMaxOpenConns(viper.GetInt("web_db_max_open"))
+	GCPDB.SetMaxIdleConns(viper.GetInt("web_db_max_idle"))
+	if err := GCPDB.Ping(); err != nil {
+		panic(fmt.Sprintf("(╯‵Д′)╯彡┻━┻ unable to connect to web DB err: %s", err))
+	}
+	log.Println("web db opened")
+
+	serv = &Services{
+		AWSProductionDB: AWSDB,
+		GCPWebAppDb:     GCPDB,
+	}
+}
+
+//BeginTransfer starts the transfer process
+func BeginTransfer(w http.ResponseWriter, r *http.Request) {
+
+	AWSProducts := []AWSProductDetails{}
+	if err := serv.AWSProductionDB.Select(&AWSProducts, `SELECT ProductTitle, ProductDesc, MRP, SellingPrice, tag, DateCreated, img_details.img_name 
 	FROM product_details
 	LEFT JOIN img_details ON product_details.tag = img_details.product_tag AND img_details.img_slot = '1' WHERE Deleted = 0;`); err != nil {
 		log.Println(err)
 	}
 
-	webDB := sqlx.MustOpen("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", viper.GetString("web_db_user"), viper.GetString("web_db_pass"), viper.GetString("web_db_host"), viper.GetString("web_db_name")))
-	webDB.SetMaxOpenConns(viper.GetInt("web_db_max_open"))
-	webDB.SetMaxIdleConns(viper.GetInt("web_db_max_idle"))
-	if err := webDB.Ping(); err != nil {
-		panic(fmt.Sprintf("(╯‵Д′)╯彡┻━┻ unable to connect to web DB err: %s", err))
-	}
-	log.Println("web db opened")
-	GCPProducts := []WebProducts{}
-	if err := webDB.Select(&GCPProducts, `SELECT name, tag, date_created
+	GCPProducts := []GCPProductDetails{}
+	if err := serv.GCPWebAppDb.Select(&GCPProducts, `SELECT name, tag, date_created
 	FROM smartshop.product ;`); err != nil {
 		log.Println(err)
 	}
@@ -84,7 +100,7 @@ func BeginTransfer(w http.ResponseWriter, r *http.Request) {
 		log.Println("Synchronization imminent")
 		if AWSProductsCount > GCPProductsCount {
 			for i := GCPProductsCount; i <= AWSProductsCount; i++ {
-				GCPProducts = append(GCPProducts, WebProducts{
+				GCPProducts = append(GCPProducts, GCPProductDetails{
 					Tag: "null",
 				})
 			}
@@ -96,7 +112,7 @@ func BeginTransfer(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				if mismatchCount != AWSProductsCount {
-					if _, err := webDB.Exec(`INSERT INTO smartshop.product
+					if _, err := serv.GCPWebAppDb.Exec(`INSERT INTO smartshop.product
 					(id_category, name, description, price, mrp, date_created, thumbnail, tag)
 					VALUES(0, ?, ?, ?, ?, ?, ?, ?);
 					`, AWSProducts[i].Title, AWSProducts[i].Desc, AWSProducts[i].SellingPrice, AWSProducts[i].Mrp, AWSProducts[i].DateCr, AWSProducts[i].ImgName, AWSProducts[i].Tag); err != nil {
@@ -106,7 +122,7 @@ func BeginTransfer(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			for i := AWSProductsCount; i <= GCPProductsCount; i++ {
-				AWSProducts = append(AWSProducts, ProductDetails{
+				AWSProducts = append(AWSProducts, AWSProductDetails{
 					Tag: "null",
 				})
 			}
@@ -119,7 +135,7 @@ func BeginTransfer(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				if !matchFound {
-					if _, err := webDB.Exec(`DELETE FROM product WHERE tag = ?`, GCPProducts[i].Tag); err != nil {
+					if _, err := serv.GCPWebAppDb.Exec(`DELETE FROM product WHERE tag = ?`, GCPProducts[i].Tag); err != nil {
 						log.Println("Deletion failed along with sync", err)
 					}
 				}

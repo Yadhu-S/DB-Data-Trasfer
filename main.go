@@ -12,6 +12,7 @@ import (
 )
 
 func main() {
+	app.InitilizeApp()
 	router := goji.NewMux()
 	router.HandleFunc(pat.Get("/insert/products"), app.BeginTransfer)
 	fmt.Println("Transfer Server online..")
