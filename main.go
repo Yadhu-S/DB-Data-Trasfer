@@ -14,7 +14,7 @@ import (
 func main() {
 	app.InitilizeApp()
 	router := goji.NewMux()
-	router.HandleFunc(pat.Get("/insert/products"), app.BeginTransfer)
+	router.HandleFunc(pat.Get("/sync/products"), app.SyncProducts)
 	fmt.Println("Transfer Server online..")
 	if err := http.ListenAndServe(":9001", router); err != nil {
 		log.Fatal("Transfer Server failed to start", err)

@@ -56,7 +56,6 @@ func InitilizeApp() {
 	AWSDB := sqlx.MustConnect("mysql", AWSSource)
 	AWSDB.SetMaxOpenConns(viper.GetInt("web_db_max_open"))
 	AWSDB.SetMaxIdleConns(viper.GetInt("web_db_max_idle"))
-	log.Println("Opening producion db")
 	if err := AWSDB.Ping(); err != nil {
 		panic(fmt.Sprintf("(╯‵Д′)╯彡┻━┻ unable to connect to web DB  err: %s", err))
 	}
@@ -76,25 +75,21 @@ func InitilizeApp() {
 	}
 }
 
-//BeginTransfer starts the transfer process
-func BeginTransfer(w http.ResponseWriter, r *http.Request) {
-
+//SyncProducts starts the product sync from AWS to GCP
+func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	AWSProducts := []AWSProductDetails{}
 	if err := serv.AWSProductionDB.Select(&AWSProducts, `SELECT ProductTitle, ProductDesc, MRP, SellingPrice, tag, DateCreated, img_details.img_name 
 	FROM product_details
 	LEFT JOIN img_details ON product_details.tag = img_details.product_tag AND img_details.img_slot = '1' WHERE Deleted = 0;`); err != nil {
 		log.Println(err)
 	}
-
 	GCPProducts := []GCPProductDetails{}
 	if err := serv.GCPWebAppDb.Select(&GCPProducts, `SELECT name, tag, date_created
 	FROM smartshop.product ;`); err != nil {
 		log.Println(err)
 	}
-	log.Println("web products fetched")
 	AWSProductsCount := len(AWSProducts)
 	GCPProductsCount := len(GCPProducts)
-	fmt.Println(AWSProductsCount, GCPProductsCount)
 	if AWSProductsCount != GCPProductsCount {
 		log.Println("DB out of sync")
 		log.Println("Synchronization imminent")
@@ -105,13 +100,13 @@ func BeginTransfer(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 			for i := range AWSProducts {
-				mismatchCount := 0
+				matchFound := false
 				for j := range GCPProducts {
-					if AWSProducts[i].Tag != GCPProducts[j].Tag {
-						mismatchCount++
+					if AWSProducts[i].Tag == GCPProducts[j].Tag {
+						matchFound = true
 					}
 				}
-				if mismatchCount != AWSProductsCount {
+				if !matchFound {
 					if _, err := serv.GCPWebAppDb.Exec(`INSERT INTO smartshop.product
 					(id_category, name, description, price, mrp, date_created, thumbnail, tag)
 					VALUES(0, ?, ?, ?, ?, ?, ?, ?);
