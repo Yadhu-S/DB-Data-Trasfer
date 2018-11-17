@@ -88,12 +88,15 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	FROM smartshop.product ;`); err != nil {
 		log.Println(err)
 	}
-
-	for i := range AWSProducts { //iteriate through each product in aws db
+	GCPCount := len(GCPProducts)
+	startAt := 0
+	for i := range AWSProducts {
 		matchFound := false
-		for j := range GCPProducts { //iteriate through each product in gcp db
-			if AWSProducts[i].Tag == GCPProducts[j].Tag { // if a match is found break the gcp loop and continue the aws iteration
+		for j := startAt; j < GCPCount; j++ {
+			if AWSProducts[i].Tag == GCPProducts[j].Tag {
 				matchFound = true
+				GCPProducts[0], GCPProducts[j] = GCPProducts[j], GCPProducts[0]
+				startAt++
 				break
 			}
 		}
@@ -106,11 +109,15 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	AWSCount := len(AWSProducts)
+	startAt = 0
 	for i := range GCPProducts {
 		matchFound := false
-		for j := range AWSProducts {
+		for j := startAt; j < AWSCount; j++ {
 			if GCPProducts[i].Tag == AWSProducts[j].Tag {
 				matchFound = true
+				AWSProducts[0], AWSProducts[j] = AWSProducts[j], AWSProducts[0]
+				startAt++
 				break
 			}
 		}
@@ -127,4 +134,9 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 		Message: "DB synced",
 	})
 	w.Write(out)
+}
+
+func swap(s []struct{}, i int) []struct{} {
+	s[0], s[i] = s[i], s[0]
+	return s
 }
