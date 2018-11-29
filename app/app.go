@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
 
 	_ "github.com/go-sql-driver/mysql" //import mysql driver
 	"github.com/jmoiron/sqlx"
@@ -78,11 +79,54 @@ func InitilizeApp() {
 //SyncProducts starts the product sync from AWS to GCP
 func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	AWSProducts := []AWSProductDetails{}
-	if err := serv.AWSProductionDB.Select(&AWSProducts, `SELECT ProductTitle, ProductDesc, MRP, SellingPrice, tag, DateCreated, img_details.img_name 
+	rows, err := serv.AWSProductionDB.Queryx(`SELECT ProductTitle, ProductDesc, MRP, SellingPrice, tag, DateCreated, img_details.img_name 
 	FROM product_details
-	LEFT JOIN img_details ON product_details.tag = img_details.product_tag AND img_details.img_slot = '1' WHERE Deleted = 0;`); err != nil { //join image details table and select non-deleted products form AWS database
+	LEFT JOIN img_details ON product_details.tag = img_details.product_tag AND img_details.img_slot = '1' WHERE Deleted = 0;`)
+	if err != nil { //join image details table and select non-deleted products form AWS database
 		log.Println(err)
 	}
+	defer func() {
+		rows.Close()
+	}()
+
+	cols, _ := rows.Columns()
+	m := make(map[string]interface{})
+	for rows.Next() {
+		// Create a slice of interface{}'s to represent each column,
+		// and a second slice to contain pointers to each item in the columns slice.
+		columns := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i, _ := range columns {
+			columnPointers[i] = &columns[i]
+		}
+
+		// Scan the result into the column pointers...
+		if err := rows.Scan(columnPointers...); err != nil {
+			log.Println(err)
+		}
+
+		// Create our map, and retrieve the value for each column from the pointers slice,
+		// storing it in the map with the name of the column as the key.
+
+		for i, colName := range cols {
+			val := columnPointers[i].(*interface{})
+			m[colName] = *val
+		}
+
+	}
+	for k, v := range m {
+		t := reflect.TypeOf(v)
+		if t != nil {
+			switch t.Kind() {
+			case reflect.Slice:
+				m[k] = fmt.Sprintf("%s", v)
+
+			default:
+				// do nothing
+			}
+		}
+	}
+	fmt.Println(m)
 	GCPProducts := []GCPProductDetails{}
 	if err := serv.GCPWebAppDb.Select(&GCPProducts, `SELECT name, tag, date_created
 	FROM smartshop.product ;`); err != nil {
