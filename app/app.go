@@ -112,11 +112,7 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	GCPProducts := []GCPProductDetails{}
 	if err := serv.GCPWebAppDb.Select(&GCPProducts, `SELECT tag
-<<<<<<< HEAD
-	FROM smartshop.product ;`); err != nil {
-=======
 	FROM smartshop.product ORDER BY tag ASC;`); err != nil {
->>>>>>> master
 		log.Println(err)
 	}
 	matchFound := false
@@ -169,7 +165,6 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
-<<<<<<< HEAD
 //SyncShopDetails does the same but for shop details
 func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 	AWSShops := []ShopDetails{}
@@ -184,14 +179,13 @@ func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 	GCPCount := len(GCPShops)
-	startAt := 0
+
 	for i := range AWSShops {
 		matchFound := false
-		for j := startAt; j < GCPCount; j++ {
+		for j := 0; j < GCPCount; j++ {
 			if AWSShops[i].ShopID == GCPShops[j].ShopID {
 				matchFound = true
-				GCPShops[0], GCPShops[j] = GCPShops[j], GCPShops[0]
-				startAt++
+
 				break
 			}
 		}
@@ -229,14 +223,12 @@ func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	AWSCount := len(AWSShops)
-	startAt = 0
+
 	for i := range GCPShops {
 		matchFound := false
-		for j := startAt; j < AWSCount; j++ {
+		for j := 0; j < AWSCount; j++ {
 			if GCPShops[i].ShopID == AWSShops[j].ShopID {
-				matchFound = true
-				AWSShops[0], AWSShops[j] = AWSShops[j], AWSShops[0]
-				startAt++
+
 				break
 			}
 		}
@@ -257,14 +249,4 @@ func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 func swap(s []struct{}, i int) []struct{} {
 	s[0], s[i] = s[i], s[0]
 	return s
-=======
-func removeGCP(s []GCPProductDetails, i int) []GCPProductDetails {
-	s[len(s)-1], s[i] = s[i], s[len(s)-1]
-	return s[:len(s)-1]
-}
-
-func removeAWS(s []AWSProductDetails, i int) []AWSProductDetails {
-	s[len(s)-1], s[i] = s[i], s[len(s)-1]
-	return s[:len(s)-1]
->>>>>>> master
 }
