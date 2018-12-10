@@ -92,7 +92,7 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 			if AWSProducts[i].Tag == GCPProducts[j].Tag {
 				matchFound = true
 				GCPProducts = removeGCP(GCPProducts, j)
-				GCPCount = len(GCPProducts)
+				GCPCount--
 				break
 			}
 		}
@@ -114,7 +114,7 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 			if GCPProducts[i].Tag == AWSProducts[j].Tag {
 				matchFound = true
 				AWSProducts = removeAWS(AWSProducts, j)
-				AWSCount = len(AWSProducts)
+				AWSCount--
 				break
 			}
 		}
