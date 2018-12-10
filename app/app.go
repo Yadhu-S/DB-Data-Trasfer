@@ -83,16 +83,16 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	FROM smartshop.product ORDER BY tag ASC;`); err != nil {
 		log.Println(err)
 	}
-
+	matchFound := false
 	temp := GCPProducts
-
+	GCPCount := len(GCPProducts)
 	for i := range AWSProducts {
-		matchFound := false
-		for j := 0; j < len(GCPProducts); j++ {
+		matchFound = false
+		for j := 0; j < GCPCount; j++ {
 			if AWSProducts[i].Tag == GCPProducts[j].Tag {
 				matchFound = true
 				GCPProducts = removeGCP(GCPProducts, j)
-				fmt.Println(GCPProducts)
+				GCPCount = len(GCPProducts)
 				break
 			}
 		}
@@ -107,13 +107,14 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	GCPProducts = temp
-
+	AWSCount := len(AWSProducts)
 	for i := range GCPProducts {
-		matchFound := false
-		for j := 0; j < len(AWSProducts); j++ {
+		matchFound = false
+		for j := 0; j < AWSCount; j++ {
 			if GCPProducts[i].Tag == AWSProducts[j].Tag {
 				matchFound = true
 				AWSProducts = removeAWS(AWSProducts, j)
+				AWSCount = len(AWSProducts)
 				break
 			}
 		}
