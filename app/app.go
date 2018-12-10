@@ -52,12 +52,7 @@ type AWSProductDetails struct {
 
 //GCPProductDetails is used for the PHP application (¬_¬)
 type GCPProductDetails struct {
-	Title        string  `db:"name"`
-	Desc         string  `db:"description" `
-	Mrp          float32 `db:"mrp"`
-	SellingPrice float32 `db:"price" `
-	Tag          string  `db:"tag"`
-	DateCr       string  `db:"date_created"`
+	Tag string `db:"tag"`
 }
 
 type sm struct {
@@ -112,23 +107,28 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	AWSProducts := []AWSProductDetails{}
 	if err := serv.AWSProductionDB.Select(&AWSProducts, `SELECT ProductTitle, ProductDesc, MRP, SellingPrice, tag, DateCreated, img_details.img_name 
 	FROM product_details
-	LEFT JOIN img_details ON product_details.tag = img_details.product_tag AND img_details.img_slot = '1' WHERE Deleted = 0;`); err != nil { //join image details table and select non-deleted products form AWS database
+	LEFT JOIN img_details ON product_details.tag = img_details.product_tag AND img_details.img_slot = '1' WHERE Deleted = 0 ORDER BY tag ASC`); err != nil { //join image details table and select non-deleted products form AWS database
 		log.Println(err)
 	}
 	GCPProducts := []GCPProductDetails{}
 	if err := serv.GCPWebAppDb.Select(&GCPProducts, `SELECT tag
+<<<<<<< HEAD
 	FROM smartshop.product ;`); err != nil {
+=======
+	FROM smartshop.product ORDER BY tag ASC;`); err != nil {
+>>>>>>> master
 		log.Println(err)
 	}
+	matchFound := false
+	temp := GCPProducts
 	GCPCount := len(GCPProducts)
-	startAt := 0
 	for i := range AWSProducts {
-		matchFound := false
-		for j := startAt; j < GCPCount; j++ {
+		matchFound = false
+		for j := 0; j < GCPCount; j++ {
 			if AWSProducts[i].Tag == GCPProducts[j].Tag {
 				matchFound = true
-				GCPProducts[0], GCPProducts[j] = GCPProducts[j], GCPProducts[0]
-				startAt++
+				GCPProducts = removeGCP(GCPProducts, j)
+				GCPCount--
 				break
 			}
 		}
@@ -141,15 +141,16 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	GCPProducts = temp
 	AWSCount := len(AWSProducts)
-	startAt = 0
 	for i := range GCPProducts {
-		matchFound := false
-		for j := startAt; j < AWSCount; j++ {
+		matchFound = false
+		for j := 0; j < AWSCount; j++ {
 			if GCPProducts[i].Tag == AWSProducts[j].Tag {
 				matchFound = true
-				AWSProducts[0], AWSProducts[j] = AWSProducts[j], AWSProducts[0]
-				startAt++
+				AWSProducts = removeAWS(AWSProducts, j)
+				AWSCount--
 				break
 			}
 		}
@@ -168,6 +169,7 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
+<<<<<<< HEAD
 //SyncShopDetails does the same but for shop details
 func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 	AWSShops := []ShopDetails{}
@@ -255,4 +257,14 @@ func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 func swap(s []struct{}, i int) []struct{} {
 	s[0], s[i] = s[i], s[0]
 	return s
+=======
+func removeGCP(s []GCPProductDetails, i int) []GCPProductDetails {
+	s[len(s)-1], s[i] = s[i], s[len(s)-1]
+	return s[:len(s)-1]
+}
+
+func removeAWS(s []AWSProductDetails, i int) []AWSProductDetails {
+	s[len(s)-1], s[i] = s[i], s[len(s)-1]
+	return s[:len(s)-1]
+>>>>>>> master
 }
