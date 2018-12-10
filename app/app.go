@@ -84,12 +84,14 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
+	temp := GCPProducts
+
 	for i := range AWSProducts {
 		matchFound := false
 		for j := 0; j < len(GCPProducts); j++ {
 			if AWSProducts[i].Tag == GCPProducts[j].Tag {
 				matchFound = true
-				GCPProducts = remove(GCPProducts, j)
+				GCPProducts = removeGCP(GCPProducts, j)
 				fmt.Println(GCPProducts)
 				break
 			}
@@ -104,23 +106,23 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// AWSCount := len(AWSProducts)
+	GCPProducts = temp
 
-	// for i := range GCPProducts {
-	// 	matchFound := false
-	// 	for j := 0; j < AWSCount; j++ {
-	// 		if GCPProducts[i].Tag == AWSProducts[j].Tag {
-	// 			matchFound = true
-	// 			AWSProducts[0], AWSProducts[j] = AWSProducts[j], AWSProducts[0]
-	// 			break
-	// 		}
-	// 	}
-	// 	if !matchFound {
-	// 		if _, err := serv.GCPWebAppDb.Exec(`DELETE FROM product WHERE tag = ?`, GCPProducts[i].Tag); err != nil {
-	// 			log.Println("Deletion failed along with sync", err)
-	// 		}
-	// 	}
-	// }
+	for i := range GCPProducts {
+		matchFound := false
+		for j := 0; j < len(AWSProducts); j++ {
+			if GCPProducts[i].Tag == AWSProducts[j].Tag {
+				matchFound = true
+				AWSProducts = removeAWS(AWSProducts, j)
+				break
+			}
+		}
+		if !matchFound {
+			if _, err := serv.GCPWebAppDb.Exec(`DELETE FROM product WHERE tag = ?`, GCPProducts[i].Tag); err != nil {
+				log.Println("Deletion failed along with sync", err)
+			}
+		}
+	}
 
 	log.Println("Done")
 	out, _ := json.Marshal(sm{
@@ -130,7 +132,12 @@ func SyncProducts(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
-func remove(s []GCPProductDetails, i int) []GCPProductDetails {
+func removeGCP(s []GCPProductDetails, i int) []GCPProductDetails {
+	s[len(s)-1], s[i] = s[i], s[len(s)-1]
+	return s[:len(s)-1]
+}
+
+func removeAWS(s []AWSProductDetails, i int) []AWSProductDetails {
 	s[len(s)-1], s[i] = s[i], s[len(s)-1]
 	return s[:len(s)-1]
 }
