@@ -173,19 +173,20 @@ func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 	`); err != nil { //join image details table and select non-deleted products form AWS database
 		log.Println(err)
 	}
-	GCPShops := []shop{}
+	GCPShops := []ShopDetails{}
 	if err := serv.GCPWebAppDb.Select(&GCPShops, `SELECT shop_id
 	FROM smartshop.shop_details ;`); err != nil {
 		log.Println(err)
 	}
 	GCPCount := len(GCPShops)
-
+	matchFound := false
 	for i := range AWSShops {
-		matchFound := false
+		matchFound = false
 		for j := 0; j < GCPCount; j++ {
 			if AWSShops[i].ShopID == GCPShops[j].ShopID {
 				matchFound = true
-
+				GCPShops = removeShop(GCPShops, j)
+				GCPCount--
 				break
 			}
 		}
@@ -225,10 +226,12 @@ func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 	AWSCount := len(AWSShops)
 
 	for i := range GCPShops {
-		matchFound := false
+		matchFound = false
 		for j := 0; j < AWSCount; j++ {
 			if GCPShops[i].ShopID == AWSShops[j].ShopID {
-
+				removeShop(AWSShops, i)
+				AWSCount--
+				matchFound = true
 				break
 			}
 		}
@@ -246,7 +249,16 @@ func SyncShopDetails(w http.ResponseWriter, r *http.Request) {
 	})
 	w.Write(out)
 }
-func swap(s []struct{}, i int) []struct{} {
-	s[0], s[i] = s[i], s[0]
-	return s
+func removeGCP(s []GCPProductDetails, i int) []GCPProductDetails {
+	s[len(s)-1], s[i] = s[i], s[len(s)-1]
+	return s[:len(s)-1]
+}
+
+func removeAWS(s []AWSProductDetails, i int) []AWSProductDetails {
+	s[len(s)-1], s[i] = s[i], s[len(s)-1]
+	return s[:len(s)-1]
+}
+func removeShop(s []ShopDetails, i int) []ShopDetails {
+	s[len(s)-1], s[i] = s[i], s[len(s)-1]
+	return s[:len(s)-1]
 }
